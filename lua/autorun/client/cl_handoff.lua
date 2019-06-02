@@ -13,14 +13,23 @@ HandOff.CTable = {
     ["active"] = false
 }
 
+function HandOff.RequestCTable(t)
+    if not HandOff.CTable.active then
+        HandOff.UpdateCTable(t)
+        return true
+    end
+    return false
+end
+
 function HandOff.UpdateCTable(t)
     local og_model = HandOff.CTable.model
     local og_seq = HandOff.CTable.sequence
+    local og_act = HandOff.CTable.active
     table.Merge(HandOff.CTable,t)
     if og_model ~= HandOff.CTable.model then
         HandOff.UpdateCMod()
     end
-    if og_seq ~= HandOff.CTable.sequence and HandOff.CTable.active then
+    if (og_seq ~= HandOff.CTable.sequence or og_actg ~= HandOff.CTable.active) and HandOff.CTable.active then
         HandOff.PlaySequence(HandOff.CTable.sequence)
     end
 end
