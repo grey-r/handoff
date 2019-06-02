@@ -221,34 +221,6 @@ function HandOff.UpdateLUT()
             end
         --end
     end
-    local ruln = HandOff.VMod:LookupBone("ValveBiped.Bip01_R_Ulna")
-    if ruln then
-        local cb = HandOff.CMod:LookupBone("ValveBiped.Bip01_R_Forearm")
-        local pb = par:LookupBone("ValveBiped.Bip01_R_Forearm")
-        HandOff.VMod.HandOffBoneLUT[ruln]=cb
-        HandOff.VMod.HandOffParLUT[ruln]=pb
-    end
-    local luln = HandOff.VMod:LookupBone("ValveBiped.Bip01_R_Ulna")
-    if luln then
-        local cb = HandOff.CMod:LookupBone("ValveBiped.Bip01_L_Forearm")
-        local pb = par:LookupBone("ValveBiped.Bip01_L_Forearm")
-        HandOff.VMod.HandOffBoneLUT[luln]=cb
-        HandOff.VMod.HandOffParLUT[luln]=pb
-    end
-    local rwri = HandOff.VMod:LookupBone("ValveBiped.Bip01_R_Wrist")
-    if rwri then
-        local cb = HandOff.CMod:LookupBone("ValveBiped.Bip01_R_Forearm")
-        local pb = par:LookupBone("ValveBiped.Bip01_R_Forearm")
-        --HandOff.VMod.HandOffBoneLUT[rwri]=cb
-        --HandOff.VMod.HandOffParLUT[rwri]=pb
-    end
-    local lwri = HandOff.VMod:LookupBone("ValveBiped.Bip01_L_Wrist")
-    if lwri then
-        local cb = HandOff.CMod:LookupBone("ValveBiped.Bip01_L_Forearm")
-        local pb = par:LookupBone("ValveBiped.Bip01_L_Forearm")
-        --HandOff.VMod.HandOffBoneLUT[lwri]=cb
-        --HandOff.VMod.HandOffParLUT[lwri]=pb
-    end
     return HandOff.VMod.HandOffBoneLUT
 end
 
@@ -265,7 +237,7 @@ end
 
 local oldvm=""
 local oldpar
-hook.Add("PreRender","handoff",function()
+hook.Add("PreDrawPlayerHands","handoff",function()
     if not IsValid(HandOff.VMod) then
         HandOff.UpdateVMod()
     else
