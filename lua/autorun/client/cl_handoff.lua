@@ -12,6 +12,7 @@ HandOff.CTable = {
     ["follow_vm"] = true,
     ["active"] = false
 }
+HandOff.ProxyModel = "models/weapons/c_crowbar.mdl"
 
 local function LerpAngleFast(t,a1,a2)
 	a1.p = math.ApproachAngle(a1.p, a2.p, math.AngleDifference(a2.p, a1.p) * t)
@@ -78,48 +79,51 @@ function HandOff:VModCallback(boneCount)
 
     for i=0, boneCount-1 do
         local mymat = self:GetBoneMatrix(i)
-        if self.HandOffParLUT[i] and PIV then
-            local m = par.BoneCache[self.HandOffParLUT[i]]
-            if m then
-                mymat:SetTranslation(m:GetTranslation())
-                mymat:SetAngles(m:GetAngles())
-            end
-        else
-            local parMat = self:GetBoneMatrix(self:GetBoneParent(i))
-            if parMat then
-                if self.HOLocalBones and self.HOLocalBones[i] then
-                    local t = self.HOLocalBones[i] 
-                    local wPos, wAng = LocalToWorld( t.pos, t.ang, parMat:GetTranslation(), parMat:GetAngles() )
-                    mymat:SetTranslation(wPos)
-                    mymat:SetAngles(wAng)
-                else
-                    mymat = parMat
-                end
-            end
-        end
-        if self.HandOffBoneLUT[i] then
-            local m = HandOff.CMod.BoneCache[self.HandOffBoneLUT[i]]
-            if m then
-                if fac==1 then
+        if mymat then
+            if self.HandOffParLUT[i] and PIV then
+                local m = par.BoneCache[self.HandOffParLUT[i]]
+                if m then
                     mymat:SetTranslation(m:GetTranslation())
                     mymat:SetAngles(m:GetAngles())
-                else
-                    mymat:SetTranslation(LerpVector(fac,mymat:GetTranslation(),m:GetTranslation()))
-                    local a1 = mymat:GetAngles()
-                    local a2 = m:GetAngles()
-                    LerpAngleFast(fac,a1,a2)
-                    mymat:SetAngles(a1)
+                end
+            end --[[else
+                local parMat = self:GetBoneMatrix(self:GetBoneParent(i))
+                if parMat then
+                    if self.HOLocalBones and self.HOLocalBones[i] then
+                        local t = self.HOLocalBones[i] 
+                        local wPos, wAng = LocalToWorld( t.pos, t.ang, parMat:GetTranslation(), parMat:GetAngles() )
+                        mymat:SetTranslation(wPos)
+                        mymat:SetAngles(wAng)
+                    else
+                        mymat = parMat
+                    end
                 end
             end
+            ]]--
+            if self.HandOffBoneLUT[i] then
+                local m = HandOff.CMod.BoneCache[self.HandOffBoneLUT[i]]
+                if m then
+                    if fac==1 then
+                        mymat:SetTranslation(m:GetTranslation())
+                        mymat:SetAngles(m:GetAngles())
+                    else
+                        mymat:SetTranslation(LerpVector(fac,mymat:GetTranslation(),m:GetTranslation()))
+                        local a1 = mymat:GetAngles()
+                        local a2 = m:GetAngles()
+                        LerpAngleFast(fac,a1,a2)
+                        mymat:SetAngles(a1)
+                    end
+                end
+            end
+            self:SetBoneMatrix(i,mymat)
         end
-        self:SetBoneMatrix(i,mymat)
     end
 end
 
 function HandOff:CacheLocalBones()
-    HandOff.VMod:SetModel(HandOff.VMod:GetModel())
-    HandOff.VMod:ResetSequence(1)
-    HandOff.VMod:SetCycle(0)
+    --HandOff.VMod:SetModel(HandOff.VMod:GetModel())
+    --HandOff.VMod:ResetSequence(1)
+    --HandOff.VMod:SetCycle(0)
     HandOff.VMod:SetupBones()
     self.HOLocalBones = {}
     local bc = self:GetBoneCount()
@@ -144,15 +148,20 @@ function HandOff:CacheLocalBones()
 end
 
 function HandOff.UpdateVMod()
-    if not IsValid(LocalPlayer()) then HandOff.VMod = nil return end
-    if not IsValid(LocalPlayer():GetHands()) then HandOff.VMod = nil return end
-    HandOff.VMod=LocalPlayer():GetHands()
-    if not IsValid(HandOff.VMod) then return end
-    if HandOff.VMod:IsEffectActive(EF_BONEMERGE_FASTCULL) then
-        HandOff.VMod:RemoveEffects(EF_BONEMERGE_FASTCULL)
+    local hands=LocalPlayer():GetHands()
+    if not IsValid(HandOff.VMod) then
+        HandOff.VMod=ClientsideModel(HandOff.ProxyModel,RENDERGROUP_VIEWMODEL)
+        HandOff.CacheLocalBones(HandOff.VMod)
+        HandOff.VMod:SetNoDraw(true)
+        HandOff.VMod:DrawShadow(false)
     end
-    if HandOff.VMod:IsEffectActive(EF_BONEMERGE) then
-        HandOff.VMod:RemoveEffects(EF_BONEMERGE)
+    if IsValid(hands) then
+        local handpar = hands:GetParent()
+        if IsValid(handpar) then
+            HandOff.VMod:SetParent(handpar)
+        else
+            HandOff.VMod:SetParent(LocalPlayer():GetViewModel())
+        end
     end
     local par = HandOff.VMod:GetParent()
     if IsValid(par) then
@@ -169,7 +178,6 @@ function HandOff.UpdateVMod()
         HandOff.VMod:RemoveCallback("BuildBonePositions",HandOff.VMod.HOBBCB)
         HandOff.VMod.HOBBCB = nil
     end
-    HandOff.CacheLocalBones(HandOff.VMod)
     HandOff.VMod.HOBBCB = HandOff.VMod:AddCallback("BuildBonePositions", HandOff.VModCallback)
     HandOff.UpdateLUT()
     return HandOff.VMod
@@ -244,7 +252,15 @@ end
 
 local oldvm=""
 local oldpar
-hook.Add("PreDrawPlayerHands","handoff",function()
+
+local HANDOFF_OVR = false
+hook.Add("PreDrawPlayerHands","zzz_handoff",function(hands,...)
+    if not IsValid(hands) then return end
+    if not HANDOFF_OVR then
+        HANDOFF_OVR = true
+        hook.Call("PreDrawPlayerHands",hands,GM or GAMEMODE,...)
+        HANDOFF_OVR = false
+    end
     if not IsValid(HandOff.VMod) then
         HandOff.UpdateVMod()
     else
@@ -252,20 +268,23 @@ hook.Add("PreDrawPlayerHands","handoff",function()
         if IsValid(vm) and ( vm:GetModel()~=oldvm or vm:GetParent()~=oldpar ) then
             oldvm=vm:GetModel()
             oldpar=vm:GetParent()
-            timer.Simple(0, HandOff.UpdateVMod)
+            HandOff.UpdateVMod()
         end
         HandOff.VMod:SetLocalPos(vector_origin)
         HandOff.VMod:SetLocalAngles(angle_zero)
+        if hands:GetParent()~=HandOff.VMod then
+            HandOff.VMod:SetParent(hands:GetParent())
+            HandOff.UpdateVMod()
+            hands:SetParent(HandOff.VMod)
+        end
     end
     if not IsValid(HandOff.CMod) then
         HandOff.UpdateCMod()
     else
         if HandOff.CTable.follow_vm then
-            if HandOff.CTable.follow_vm ~= HandOff.VMod then
-                HandOff.CMod:SetParent(HandOff.VMod)
-                HandOff.CMod:SetLocalPos(vector_origin)
-                HandOff.CMod:SetLocalAngles(angle_zero)
-            end
+            HandOff.CMod:SetParent(HandOff.VMod)
+            HandOff.CMod:SetLocalPos(vector_origin)
+            HandOff.CMod:SetLocalAngles(angle_zero)
         else
             HandOff.CMod:SetPos(EyePos())
             HandOff.CMod:SetAngles(EyeAngles())
@@ -279,8 +298,10 @@ hook.Add("PreDrawPlayerHands","handoff",function()
             end
         end
         HandOff.CMod:SetupBones()
+        HandOff.VMod:SetupBones()
         if HandOff.CTable.draw and HandOff.CTable.active then
             HandOff.CMod:DrawModel()
         end
     end
+    return false
 end)
