@@ -77,17 +77,22 @@ local flashStatus = {
 if SERVER then
     util.AddNetworkString(netstring)
     net.Receive(netstring,function(l,ply)
+        local cha=false
         if ply.HandOffStatus=="idle" then
             ply.HandOffStatus="flashlight_draw"
             ply.HandOffStatusEnd=CurTime()+drawtime
+            cha=true
         elseif ply.HandOffStatus=="flashlight_idle" then
             ply.HandOffStatus="flashlight_holster"
             ply.HandOffStatusEnd=CurTime()+holstertime
+            cha=true
         end
-        net.Start(netstring)
-        net.WriteEntity(ply)
-        net.WriteString(ply.HandOffStatus)
-        net.Broadcast()
+        if cha then
+            net.Start(netstring)
+            net.WriteEntity(ply)
+            net.WriteString(ply.HandOffStatus)
+            net.Broadcast()
+        end
     end)
 end
 if CLIENT then
@@ -123,6 +128,7 @@ if CLIENT then
             if islocal and IsValid(HandOff.CMod) then
                 HandOff.CMod:SetupBones()
                 angpos = HandOff.CMod:GetAttachment(flashlight.attachment)
+                if not angpos then return end
                 angpos.Pos = angpos.Pos - angpos.Ang:Forward()
             else
                 local p,a = ply:GetBonePosition(ply:LookupBone("ValveBiped.Bip01_R_Hand") or 1)
