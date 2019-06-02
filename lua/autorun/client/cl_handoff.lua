@@ -13,6 +13,12 @@ HandOff.CTable = {
     ["active"] = false
 }
 
+local function LerpAngleFast(t,a1,a2)
+	a1.p = math.ApproachAngle(a1.p, a2.p, math.AngleDifference(a2.p, a1.p) * t)
+	a1.y = math.ApproachAngle(a1.y, a2.y, math.AngleDifference(a2.y, a1.y) * t)
+    a1.r = math.ApproachAngle(a1.r, a2.r, math.AngleDifference(a2.r, a1.r) * t)
+end
+
 function HandOff.RequestCTable(t)
     if not HandOff.CTable.active then
         HandOff.UpdateCTable(t)
@@ -35,12 +41,6 @@ function HandOff.UpdateCTable(t)
 end
 
 local rotAng = Angle(90,0,0)
-
-local function LerpAngleFast(fac,a1,a2)
-    a1.p = Lerp(fac,a1.p,a2.p)
-    a1.y = Lerp(fac,a1.y,a2.y)
-    a1.r = Lerp(fac,a1.r,a2.r)
-end
 
 function HandOff:CModCallback(boneCount)
     for i=0, boneCount-1 do
@@ -106,9 +106,7 @@ function HandOff:VModCallback(boneCount)
                 else
                     mymat:SetTranslation(LerpVector(fac,mymat:GetTranslation(),m:GetTranslation()))
                     local a1 = mymat:GetAngles()
-                    a1:Normalize()
                     local a2 = m:GetAngles()
-                    a2:Normalize()
                     LerpAngleFast(fac,a1,a2)
                     mymat:SetAngles(a1)
                 end

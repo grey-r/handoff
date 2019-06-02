@@ -1,6 +1,25 @@
 if SERVER then
     AddCSLuaFile()
 end
+HandOff = HandOff or {}
+HandOff.Status = "idle"
+HandOff.StatusEnd = -1
+HandOff.StatusTable = HandOff.StatusTable or {
+    --["test"] = function() print("status ended") end
+}
+
+function HandOff.Update(ply)
+    if HandOff.StatusEnd~=-1 and HandOff.StatusEnd<=CurTime() then
+        local f = HandOff.StatusTable[HandOff.Status]
+        HandOff.StatusEnd=-1
+        HandOff.Status="idle"
+        if f then
+            f(ply)
+        end
+    end
+end
+
+hook.Add("PlayerTick","HandOff",HandOff.Update)
 
 local path = "handoff/"
 local flist = file.Find(path.."*.lua","LUA")
