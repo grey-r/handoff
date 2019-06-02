@@ -17,10 +17,57 @@ function HandOff:CModCallback(boneCount)
         self.BoneCache[i] = self:GetBoneMatrix(i)
     end
 end
+
+local ignore = {
+    ["ValveBiped.Bip01_R_Ulna"] = true,
+    ["ValveBiped.Bip01_R_Wrist"] = true,
+    ["ValveBiped.Bip01_L_Ulna"] = true,
+    ["ValveBiped.Bip01_L_Wrist"] = true,
+}
+
 function HandOff:VModCallback(boneCount)
     if not IsValid(HandOff.CMod) then return end
     if not HandOff.VMod.HandOffBoneLUT then return end
-    HandOff.CMod:SetupBones()
+    if not HandOff.VMod.HandOffParLUT then return end
+    local PIV = IsValid(self.HOPar) and self.HOPar.BoneCache
+    HandOff.CMod:SetupBones() 
+    if PIV then
+        self.HOPar:SetupBones()
+    end
+    for i=0, boneCount-1 do
+        local mymat = self:GetBoneMatrix(i)
+        if self.HandOffBoneLUT[i] then
+            local m = HandOff.CMod.BoneCache[self.HandOffBoneLUT[i]]
+            if m then
+                mymat:SetTranslation(m:GetTranslation())
+                mymat:SetAngles(m:GetAngles())
+                self:SetBoneMatrix(i,mymat)
+            end
+        elseif self.HandOffParLUT[i] and PIV then
+            local m = self.HOPar.BoneCache[self.HandOffParLUT[i]]
+            if m then
+                mymat:SetTranslation(m:GetTranslation())
+                mymat:SetAngles(m:GetAngles())
+                self:SetBoneMatrix(i,mymat)
+            end
+        else
+            local parMat = self:GetBoneMatrix(self:GetBoneParent(i))
+            if parMat then
+                if self.HOLocalBones and self.HOLocalBones[i] then
+                    local t = self.HOLocalBones[i] 
+                    local wPos, wAng = LocalToWorld( t.pos, t.ang, parMat:GetTranslation(), parMat:GetAngles() )
+                    mymat:SetTranslation(wPos)
+                    mymat:SetAngles(wAng)
+                    self:SetBoneMatrix(i,mymat)
+                else
+                    self:SetBoneMatrix(i,parMat)
+                end
+            end
+        end
+    end
+    self:SetPos(EyePos())
+    self:SetAngles(EyeAngles())
+    --[[
     local bin,bout,fac
     bin = HandOff.CTable.blendin
     bout = HandOff.CTable.blendout
@@ -56,23 +103,75 @@ function HandOff:VModCallback(boneCount)
             end
         end
     end
+    ]]--
+end
+
+function HandOff:VModParent(ent)
+    self.HOPar=ent
+    HandOff.UpdateVMod()
+end
+
+function HandOff:CacheLocalBones()
+    HandOff.VMod:SetModel(HandOff.VMod:GetModel())
+    HandOff.VMod:ResetSequence(0)
+    HandOff.VMod:SetCycle(0)
+    HandOff.VMod:SetupBones()
+    self.HOLocalBones = {}
+    local bc = self:GetBoneCount()
+    for i=0, bc-1 do
+        local par = self:GetBoneParent(i)
+        if par and par>=0 then
+            local parMat = self:GetBoneMatrix(par)
+            local boneMat = self:GetBoneMatrix(i)
+            if parMat and boneMat then
+                local parPos = parMat:GetTranslation()
+                local bonePos = boneMat:GetTranslation()
+                local parAng = parMat:GetAngles()
+                local boneAng = boneMat:GetAngles()
+                local lPos, lAng = WorldToLocal( bonePos, boneAng, parPos, parAng )
+                self.HOLocalBones[i] = {
+                    ["pos"] = lPos,
+                    ["ang"] = lAng
+                }
+            end
+        end
+    end
 end
 
 function HandOff.UpdateVMod()
     if not IsValid(LocalPlayer()) then HandOff.VMod = nil return end
     if not IsValid(LocalPlayer():GetHands()) then HandOff.VMod = nil return end
     HandOff.VMod=LocalPlayer():GetHands()
+    if not IsValid(HandOff.VMod) then return end
+    if HandOff.VMod:IsEffectActive(EF_BONEMERGE_FASTCULL) then
+        HandOff.VMod:RemoveEffects(EF_BONEMERGE_FASTCULL)
+    end
+    if HandOff.VMod:IsEffectActive(EF_BONEMERGE) then
+        HandOff.VMod:RemoveEffects(EF_BONEMERGE)
+    end
     local par = HandOff.VMod:GetParent()
-    while IsValid(par) and par:LookupBone("ValveBiped.Bip01_L_Hand") and ( HandOff.VMod:IsEffectActive(EF_BONEMERGE) or HandOff.VMod:IsEffectActive(EF_BONEMERGE_FASTCULL) ) do
-        HandOff.VMod = par
-        par = HandOff.VMod:GetParent()
+    if not IsValid(par) then
+        par = HandOff.VMod.HOPar
     end
-    if HandOff.VMod.CB then
-        HandOff.VMod:RemoveCallback("BuildBonePositions", HandOff.VMod.CB)
-        HandOff.VMod.CB = nil
+    if IsValid(par) then
+        HandOff.VMod.HOPar=par
+        HandOff.VMod:SetParent(nil)
+        if par.HOBBCB then
+            par:RemoveCallback("BuildBonePositions",par.HOBBCB)
+            par.HOBBCB = nil
+        end
+        par.BoneCache = {}
+        par.HOBBCB = par:AddCallback("BuildBonePositions", HandOff.CModCallback)
     end
-    HandOff.VMod.CB = HandOff.VMod:AddCallback("BuildBonePositions", HandOff.VModCallback)
+    HandOff.VMod.SetParent = HandOff.VModParent
     HandOff.VMod.HandOffBoneLUT = {}
+    HandOff.VMod.HandOffParLUT = {}
+    if HandOff.VMod.HOBBCB then
+        HandOff.VMod:RemoveCallback("BuildBonePositions",HandOff.VMod.HOBBCB)
+        HandOff.VMod.HOBBCB = nil
+    end
+    HandOff.CacheLocalBones(HandOff.VMod)
+    HandOff.VMod.HOBBCB = HandOff.VMod:AddCallback("BuildBonePositions", HandOff.VModCallback)
     HandOff.UpdateLUT()
     return HandOff.VMod
 end
@@ -84,7 +183,7 @@ function HandOff.UpdateCMod()
     if not HandOff.CTable.model then return end
     if HandOff.CTable.model=="" then return end
     HandOff.CMod=ClientsideModel(HandOff.CTable.model,RENDERGROUP_VIEWMODEL)
-    HandOff.CMod.CB = HandOff.CMod:AddCallback("BuildBonePositions", HandOff.CModCallback)
+    HandOff.CMod.HOBBCB = HandOff.CMod:AddCallback("BuildBonePositions", HandOff.CModCallback)
     HandOff.CMod:SetNoDraw(not HandOff.CTable.draw)
     HandOff.CMod:DrawShadow(HandOff.CTable.draw)
     if IsValid(HandOff.VMod) then
@@ -106,23 +205,49 @@ function HandOff.UpdateLUT()
     if not IsValid(HandOff.CMod) then return end
     if not IsValid(HandOff.VMod) then return end
     table.Empty(HandOff.VMod.HandOffBoneLUT)
-    local bnm = false
-    if HandOff.VMod:IsEffectActive(EF_BONEMERGE) or HandOff.VMod:IsEffectActive(EF_BONEMERGE_FASTCULL) then bnm=true end
-    local par = HandOff.VMod:GetParent()
-    if bnm and not IsValid(par) then
-        bnm = false
-    end
-    if bnm then print(par) end
+    table.Empty(HandOff.VMod.HandOffParLUT)
+    local par = HandOff.VMod.HOPar
     local bc = HandOff.VMod:GetBoneCount()
     for i=0, bc-1 do
         local bn = HandOff.VMod:GetBoneName(i)
-        if (not HandOff.VMod:BoneHasFlag(i,BONE_PHYSICALLY_SIMULATED)) and (not HandOff.VMod:BoneHasFlag(i,BONE_PHYSICS_PROCEDURAL))
-        and (not HandOff.VMod:BoneHasFlag(i,BONE_ALWAYS_PROCEDURAL)) and not ( HandOff.CTable.left and not string.find(string.lower(bn),"l_") ) then
-            local bid = HandOff.CMod:LookupBone(bn)
-            if not ( bnm and par:LookupBone(bn) and par:BoneHasFlag(par:LookupBone(bn), BONE_USED_BY_BONE_MERGE)) then
+        --if (not string.find(string.lower(bn),"ulna")) and (not string.find(string.lower(bn),"wrist")) then
+            if not ( HandOff.CTable.left and not string.find(string.lower(bn),"l_") ) then
+                local bid = HandOff.CMod:LookupBone(bn)
                 HandOff.VMod.HandOffBoneLUT[i]=bid
             end
-        end
+            if IsValid(par) then
+                local bid = par:LookupBone(bn)
+                HandOff.VMod.HandOffParLUT[i]=bid
+            end
+        --end
+    end
+    local ruln = HandOff.VMod:LookupBone("ValveBiped.Bip01_R_Ulna")
+    if ruln then
+        local cb = HandOff.CMod:LookupBone("ValveBiped.Bip01_R_Forearm")
+        local pb = par:LookupBone("ValveBiped.Bip01_R_Forearm")
+        HandOff.VMod.HandOffBoneLUT[ruln]=cb
+        HandOff.VMod.HandOffParLUT[ruln]=pb
+    end
+    local luln = HandOff.VMod:LookupBone("ValveBiped.Bip01_R_Ulna")
+    if luln then
+        local cb = HandOff.CMod:LookupBone("ValveBiped.Bip01_L_Forearm")
+        local pb = par:LookupBone("ValveBiped.Bip01_L_Forearm")
+        HandOff.VMod.HandOffBoneLUT[luln]=cb
+        HandOff.VMod.HandOffParLUT[luln]=pb
+    end
+    local rwri = HandOff.VMod:LookupBone("ValveBiped.Bip01_R_Wrist")
+    if rwri then
+        local cb = HandOff.CMod:LookupBone("ValveBiped.Bip01_R_Forearm")
+        local pb = par:LookupBone("ValveBiped.Bip01_R_Forearm")
+        --HandOff.VMod.HandOffBoneLUT[rwri]=cb
+        --HandOff.VMod.HandOffParLUT[rwri]=pb
+    end
+    local lwri = HandOff.VMod:LookupBone("ValveBiped.Bip01_L_Wrist")
+    if lwri then
+        local cb = HandOff.CMod:LookupBone("ValveBiped.Bip01_L_Forearm")
+        local pb = par:LookupBone("ValveBiped.Bip01_L_Forearm")
+        --HandOff.VMod.HandOffBoneLUT[lwri]=cb
+        --HandOff.VMod.HandOffParLUT[lwri]=pb
     end
     return HandOff.VMod.HandOffBoneLUT
 end
@@ -138,10 +263,6 @@ function HandOff.PlaySequence(seq)
     HandOff.CMod:SetCycle(0)
 end
 
-hook.Add("OnViewModelChanged","handoff",function(vm,old,new)
-    HandOff.UpdateVMod()
-end)
-
 local oldvm=""
 local oldpar
 hook.Add("PreRender","handoff",function()
@@ -153,6 +274,7 @@ hook.Add("PreRender","handoff",function()
             oldvm=vm:GetModel()
             oldpar=vm:GetParent()
             HandOff.UpdateVMod()
+            timer.Simple(0, HandOff.UpdateVMod)
         end
     end
     if not IsValid(HandOff.CMod) then
