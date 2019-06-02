@@ -8,10 +8,29 @@ HandOff.CTable = {
     ["left"] = true,
     ["blendin"] = true,
     ["blendout"] = true,
-    ["follow_vm"] = false
+    ["follow_vm"] = true,
+    ["active"] = false
 }
 
+function HandOff.UpdateCTable(t)
+    local og_model = HandOff.CTable.model
+    local og_seq = HandOff.CTable.sequence
+    table.Merge(HandOff.CTable,t)
+    if og_model ~= HandOff.CTable.model then
+        HandOff.UpdateCMod()
+    end
+    if og_seq ~= HandOff.CTable.sequence then
+        HandOff.PlaySequence(HandOff.CTable.sequence)
+    end
+end
+
 local rotAng = Angle(90,0,0)
+
+local function LerpAngleFast(fac,a1,a2)
+    a1.p = Lerp(fac,a1.p,a2.p)
+    a1.y = Lerp(fac,a1.y,a2.y)
+    a1.r = Lerp(fac,a1.r,a2.r)
+end
 
 function HandOff:CModCallback(boneCount)
     for i=0, boneCount-1 do
@@ -23,47 +42,17 @@ function HandOff:VModCallback(boneCount)
     if not IsValid(HandOff.CMod) then return end
     if not HandOff.VMod.HandOffBoneLUT then return end
     if not HandOff.VMod.HandOffParLUT then return end
+
     local par = self:GetParent()
     local PIV = IsValid(par) and par.BoneCache
     if PIV then
         par:SetupBones()
     end
-    for i=0, boneCount-1 do
-        local mymat = self:GetBoneMatrix(i)
-        if self.HandOffBoneLUT[i] then
-            local m = HandOff.CMod.BoneCache[self.HandOffBoneLUT[i]]
-            if m then
-                mymat:SetTranslation(m:GetTranslation())
-                mymat:SetAngles(m:GetAngles())
-                self:SetBoneMatrix(i,mymat)
-            end
-        elseif self.HandOffParLUT[i] and PIV then
-            local m = par.BoneCache[self.HandOffParLUT[i]]
-            if m then
-                mymat:SetTranslation(m:GetTranslation())
-                mymat:SetAngles(m:GetAngles())
-                self:SetBoneMatrix(i,mymat)
-            end
-        else
-            local parMat = self:GetBoneMatrix(self:GetBoneParent(i))
-            if parMat then
-                if self.HOLocalBones and self.HOLocalBones[i] then
-                    local t = self.HOLocalBones[i] 
-                    local wPos, wAng = LocalToWorld( t.pos, t.ang, parMat:GetTranslation(), parMat:GetAngles() )
-                    mymat:SetTranslation(wPos)
-                    mymat:SetAngles(wAng)
-                    self:SetBoneMatrix(i,mymat)
-                else
-                    self:SetBoneMatrix(i,parMat)
-                end
-            end
-        end
-    end
-    --[[
+
     local bin,bout,fac
     bin = HandOff.CTable.blendin
     bout = HandOff.CTable.blendout
-    fac = 1
+    fac = HandOff.CTable.active and 1 or 0
     if bin then
         if not isnumber(bin) then
             bin = 0.2 / HandOff.CMod:SequenceDuration() --0.2 seconds blend
@@ -76,31 +65,52 @@ function HandOff:VModCallback(boneCount)
         end
         fac=fac*(1-math.Clamp(bout-(1-HandOff.CMod:GetCycle()),0,bout)/bout)
     end
-    for k,v in pairs(HandOff.VMod.HandOffBoneLUT) do
-        local m = HandOff.CMod.BoneCache[v]
-        local mymat=self:GetBoneMatrix(k)
-        if m and mymat then
-            if fac==1 then
+
+    for i=0, boneCount-1 do
+        local mymat = self:GetBoneMatrix(i)
+        if self.HandOffParLUT[i] and PIV then
+            local m = par.BoneCache[self.HandOffParLUT[i]]
+            if m then
                 mymat:SetTranslation(m:GetTranslation())
                 mymat:SetAngles(m:GetAngles())
-                self:SetBoneMatrix(k,mymat)
-            else
-                mymat:SetTranslation(LerpVector(fac,mymat:GetTranslation(),m:GetTranslation()))
-                local a1 = mymat:GetAngles()
-                a1:Normalize()
-                local a2 = m:GetAngles()
-                a2:Normalize()
-                mymat:SetAngles(LerpAngle(fac,a1,a2))
-                self:SetBoneMatrix(k,mymat)
+            end
+        else
+            local parMat = self:GetBoneMatrix(self:GetBoneParent(i))
+            if parMat then
+                if self.HOLocalBones and self.HOLocalBones[i] then
+                    local t = self.HOLocalBones[i] 
+                    local wPos, wAng = LocalToWorld( t.pos, t.ang, parMat:GetTranslation(), parMat:GetAngles() )
+                    mymat:SetTranslation(wPos)
+                    mymat:SetAngles(wAng)
+                else
+                    mymat = parMat
+                end
             end
         end
+        if self.HandOffBoneLUT[i] then
+            local m = HandOff.CMod.BoneCache[self.HandOffBoneLUT[i]]
+            if m then
+                if fac==1 then
+                    mymat:SetTranslation(m:GetTranslation())
+                    mymat:SetAngles(m:GetAngles())
+                else
+                    mymat:SetTranslation(LerpVector(fac,mymat:GetTranslation(),m:GetTranslation()))
+                    local a1 = mymat:GetAngles()
+                    a1:Normalize()
+                    local a2 = m:GetAngles()
+                    a2:Normalize()
+                    LerpAngleFast(fac,a1,a2)
+                    mymat:SetAngles(a1)
+                end
+            end
+        end
+        self:SetBoneMatrix(i,mymat)
     end
-    ]]--
 end
 
 function HandOff:CacheLocalBones()
     HandOff.VMod:SetModel(HandOff.VMod:GetModel())
-    HandOff.VMod:ResetSequence(0)
+    HandOff.VMod:ResetSequence(1)
     HandOff.VMod:SetCycle(0)
     HandOff.VMod:SetupBones()
     self.HOLocalBones = {}
@@ -165,7 +175,7 @@ function HandOff.UpdateCMod()
     if HandOff.CTable.model=="" then return end
     HandOff.CMod=ClientsideModel(HandOff.CTable.model,RENDERGROUP_VIEWMODEL)
     HandOff.CMod.HOBBCB = HandOff.CMod:AddCallback("BuildBonePositions", HandOff.CModCallback)
-    HandOff.CMod:SetNoDraw(not HandOff.CTable.draw)
+    HandOff.CMod:SetNoDraw(true)
     HandOff.CMod:DrawShadow(HandOff.CTable.draw)
     if IsValid(HandOff.VMod) and HandOff.CTable.follow_vm then
         HandOff.CMod:SetParent(HandOff.VMod)
@@ -174,10 +184,14 @@ function HandOff.UpdateCMod()
     end
     HandOff.CMod.AutomaticFrameAdvance=false
     HandOff.CMod.BoneCache={}
+    HandOff.CMod:ResetSequence(1)
+    HandOff.CMod:SetCycle(0.99)
+    --[[
     local s = HandOff.CMod:LookupSequence(HandOff.CTable.sequence)
     if s and s~=-1 then
         HandOff.CMod:ResetSequence(s)
     end
+    ]]--
     HandOff.UpdateLUT()
     return HandOff.CMod
 end
@@ -213,6 +227,7 @@ function HandOff.PlaySequence(seq)
     end
     if seq then
         HandOff.CMod:ResetSequence(seq)
+        HandOff.CTable.sequence = seq
     end
     HandOff.CMod:SetCycle(0)
 end
@@ -235,11 +250,20 @@ hook.Add("PreDrawPlayerHands","handoff",function()
     if not IsValid(HandOff.CMod) then
         HandOff.UpdateCMod()
     else
-        if not HandOff.CTable.follow_vm then
-            HandOff.CMod:SetPos(EyePos())
-            HandOff.CMod:SetAngles(EyeAngles())
+        if HandOff.CTable.follow_vm then
+            if HandOff.CTable.follow_vm ~= HandOff.VMod then
+                HandOff.CMod:SetParent(HandOff.VMod)
+                HandOff.CMod:SetLocalPos(vector_origin)
+                HandOff.CMod:SetLocalAngles(angle_zero)
+            end
+        else
+            HandOff.CMod:SetPos(LocalPlayer():EyePos())
+            HandOff.CMod:SetAngles(LocalPlayer():EyeAngles())
         end
         HandOff.CMod:FrameAdvance(FrameTime())
         HandOff.CMod:SetupBones()
+        if HandOff.CTable.draw then
+            HandOff.CMod:DrawModel()
+        end
     end
 end)
