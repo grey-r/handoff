@@ -18,21 +18,14 @@ function HandOff:CModCallback(boneCount)
     end
 end
 
-local ignore = {
-    ["ValveBiped.Bip01_R_Ulna"] = true,
-    ["ValveBiped.Bip01_R_Wrist"] = true,
-    ["ValveBiped.Bip01_L_Ulna"] = true,
-    ["ValveBiped.Bip01_L_Wrist"] = true,
-}
-
 function HandOff:VModCallback(boneCount)
     if not IsValid(HandOff.CMod) then return end
     if not HandOff.VMod.HandOffBoneLUT then return end
     if not HandOff.VMod.HandOffParLUT then return end
-    local PIV = IsValid(self.HOPar) and self.HOPar.BoneCache
-    HandOff.CMod:SetupBones() 
+    local par = self:GetParent()
+    local PIV = IsValid(par) and par.BoneCache
     if PIV then
-        self.HOPar:SetupBones()
+        par:SetupBones()
     end
     for i=0, boneCount-1 do
         local mymat = self:GetBoneMatrix(i)
@@ -44,7 +37,7 @@ function HandOff:VModCallback(boneCount)
                 self:SetBoneMatrix(i,mymat)
             end
         elseif self.HandOffParLUT[i] and PIV then
-            local m = self.HOPar.BoneCache[self.HandOffParLUT[i]]
+            local m = par.BoneCache[self.HandOffParLUT[i]]
             if m then
                 mymat:SetTranslation(m:GetTranslation())
                 mymat:SetAngles(m:GetAngles())
@@ -65,8 +58,6 @@ function HandOff:VModCallback(boneCount)
             end
         end
     end
-    self:SetPos(EyePos())
-    self:SetAngles(EyeAngles())
     --[[
     local bin,bout,fac
     bin = HandOff.CTable.blendin
@@ -104,11 +95,6 @@ function HandOff:VModCallback(boneCount)
         end
     end
     ]]--
-end
-
-function HandOff:VModParent(ent)
-    self.HOPar=ent
-    HandOff.UpdateVMod()
 end
 
 function HandOff:CacheLocalBones()
@@ -150,12 +136,7 @@ function HandOff.UpdateVMod()
         HandOff.VMod:RemoveEffects(EF_BONEMERGE)
     end
     local par = HandOff.VMod:GetParent()
-    if not IsValid(par) then
-        par = HandOff.VMod.HOPar
-    end
     if IsValid(par) then
-        HandOff.VMod.HOPar=par
-        HandOff.VMod:SetParent(nil)
         if par.HOBBCB then
             par:RemoveCallback("BuildBonePositions",par.HOBBCB)
             par.HOBBCB = nil
@@ -163,7 +144,6 @@ function HandOff.UpdateVMod()
         par.BoneCache = {}
         par.HOBBCB = par:AddCallback("BuildBonePositions", HandOff.CModCallback)
     end
-    HandOff.VMod.SetParent = HandOff.VModParent
     HandOff.VMod.HandOffBoneLUT = {}
     HandOff.VMod.HandOffParLUT = {}
     if HandOff.VMod.HOBBCB then
@@ -206,7 +186,8 @@ function HandOff.UpdateLUT()
     if not IsValid(HandOff.VMod) then return end
     table.Empty(HandOff.VMod.HandOffBoneLUT)
     table.Empty(HandOff.VMod.HandOffParLUT)
-    local par = HandOff.VMod.HOPar
+    local par = HandOff.VMod:GetParent()
+    if not IsValid(par) then return end
     local bc = HandOff.VMod:GetBoneCount()
     for i=0, bc-1 do
         local bn = HandOff.VMod:GetBoneName(i)
@@ -245,13 +226,15 @@ hook.Add("PreDrawPlayerHands","handoff",function()
         if IsValid(vm) and ( vm:GetModel()~=oldvm or vm:GetParent()~=oldpar ) then
             oldvm=vm:GetModel()
             oldpar=vm:GetParent()
-            HandOff.UpdateVMod()
             timer.Simple(0, HandOff.UpdateVMod)
         end
+        HandOff.VMod:SetLocalPos(vector_origin)
+        HandOff.VMod:SetLocalAngles(angle_zero)
     end
     if not IsValid(HandOff.CMod) then
         HandOff.UpdateCMod()
     else
         HandOff.CMod:FrameAdvance(FrameTime())
+        HandOff.CMod:SetupBones()
     end
 end)
