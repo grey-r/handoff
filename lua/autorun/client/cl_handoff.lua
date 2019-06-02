@@ -12,7 +12,7 @@ HandOff.CTable = {
     ["follow_vm"] = true,
     ["active"] = false
 }
-HandOff.ProxyModel = "models/weapons/c_crowbar.mdl"
+HandOff.ProxyModel = "models/weapons/v_hands.mdl"
 
 local function LerpAngleFast(t,a1,a2)
 	a1.p = math.ApproachAngle(a1.p, a2.p, math.AngleDifference(a2.p, a1.p) * t)
@@ -86,20 +86,7 @@ function HandOff:VModCallback(boneCount)
                     mymat:SetTranslation(m:GetTranslation())
                     mymat:SetAngles(m:GetAngles())
                 end
-            end --[[else
-                local parMat = self:GetBoneMatrix(self:GetBoneParent(i))
-                if parMat then
-                    if self.HOLocalBones and self.HOLocalBones[i] then
-                        local t = self.HOLocalBones[i] 
-                        local wPos, wAng = LocalToWorld( t.pos, t.ang, parMat:GetTranslation(), parMat:GetAngles() )
-                        mymat:SetTranslation(wPos)
-                        mymat:SetAngles(wAng)
-                    else
-                        mymat = parMat
-                    end
-                end
             end
-            ]]--
             if self.HandOffBoneLUT[i] then
                 local m = HandOff.CMod.BoneCache[self.HandOffBoneLUT[i]]
                 if m then
@@ -120,38 +107,10 @@ function HandOff:VModCallback(boneCount)
     end
 end
 
-function HandOff:CacheLocalBones()
-    --HandOff.VMod:SetModel(HandOff.VMod:GetModel())
-    --HandOff.VMod:ResetSequence(1)
-    --HandOff.VMod:SetCycle(0)
-    HandOff.VMod:SetupBones()
-    self.HOLocalBones = {}
-    local bc = self:GetBoneCount()
-    for i=0, bc-1 do
-        local par = self:GetBoneParent(i)
-        if par and par>=0 then
-            local parMat = self:GetBoneMatrix(par)
-            local boneMat = self:GetBoneMatrix(i)
-            if parMat and boneMat then
-                local parPos = parMat:GetTranslation()
-                local bonePos = boneMat:GetTranslation()
-                local parAng = parMat:GetAngles()
-                local boneAng = boneMat:GetAngles()
-                local lPos, lAng = WorldToLocal( bonePos, boneAng, parPos, parAng )
-                self.HOLocalBones[i] = {
-                    ["pos"] = lPos,
-                    ["ang"] = lAng
-                }
-            end
-        end
-    end
-end
-
 function HandOff.UpdateVMod()
     local hands=LocalPlayer():GetHands()
     if not IsValid(HandOff.VMod) then
         HandOff.VMod=ClientsideModel(HandOff.ProxyModel,RENDERGROUP_VIEWMODEL)
-        HandOff.CacheLocalBones(HandOff.VMod)
         HandOff.VMod:SetNoDraw(true)
         HandOff.VMod:DrawShadow(false)
     end
@@ -202,12 +161,6 @@ function HandOff.UpdateCMod()
     HandOff.CMod.BoneCache={}
     HandOff.CMod:ResetSequence(1)
     HandOff.CMod:SetCycle(0.99)
-    --[[
-    local s = HandOff.CMod:LookupSequence(HandOff.CTable.sequence)
-    if s and s~=-1 then
-        HandOff.CMod:ResetSequence(s)
-    end
-    ]]--
     HandOff.UpdateLUT()
     return HandOff.CMod
 end
@@ -222,16 +175,14 @@ function HandOff.UpdateLUT()
     local bc = HandOff.VMod:GetBoneCount()
     for i=0, bc-1 do
         local bn = HandOff.VMod:GetBoneName(i)
-        --if (not string.find(string.lower(bn),"ulna")) and (not string.find(string.lower(bn),"wrist")) then
-            if not ( HandOff.CTable.left and not string.find(string.lower(bn),"l_") ) then
-                local bid = HandOff.CMod:LookupBone(bn)
-                HandOff.VMod.HandOffBoneLUT[i]=bid
-            end
-            if IsValid(par) then
-                local bid = par:LookupBone(bn)
-                HandOff.VMod.HandOffParLUT[i]=bid
-            end
-        --end
+        if not ( HandOff.CTable.left and not string.find(string.lower(bn),"l_") ) then
+            local bid = HandOff.CMod:LookupBone(bn)
+            HandOff.VMod.HandOffBoneLUT[i]=bid
+        end
+        if IsValid(par) then
+            local bid = par:LookupBone(bn)
+            HandOff.VMod.HandOffParLUT[i]=bid
+        end
     end
     return HandOff.VMod.HandOffBoneLUT
 end
