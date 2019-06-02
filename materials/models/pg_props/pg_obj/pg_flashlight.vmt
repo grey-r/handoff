@@ -1,0 +1,20 @@
+"vertexlitgeneric"
+{
+	"$baseTexture" "models\PG_props\pg_obj/pg_flashlight"
+	"$bumpmap" "models\PG_props\pg_obj/pg_flashlight_bump"
+	"$model" "1"
+	"$normalmapalphaenvmapmask" "1"
+
+	"$phong"     "1"
+	"$phongexponent"  "17"
+	"$phongboost"   "1.9"
+	"$phongfresnelranges"   "[1 9 3]"
+	"$phongalbedotint" "1"
+	"$halflambert" "1"
+
+	"$rimlight" "1"
+	"$rimlightexponent" "30"
+	"$rimlightboost" "0.1"
+	
+
+}

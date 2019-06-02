@@ -1,0 +1,19 @@
+"vertexlitgeneric"
+{
+	"$baseTexture" "models\PG_props\pg_obj/pg_flare_skin2"
+	"$bumpmap" "models\PG_props\pg_obj/pg_flare_skin2_bump"
+	"$model" "1"
+
+	"$phong"     "1"
+	"$phongexponent"  "17"
+	"$phongboost"   "0.9"
+	"$phongfresnelranges"   "[1 9 3]"
+	"$phongalbedotint" "1"
+	"$halflambert" "1"
+
+	"$rimlight" "1"
+	"$rimlightexponent" "30"
+	"$rimlightboost" "0.1"
+	
+
+}
