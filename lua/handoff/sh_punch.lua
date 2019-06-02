@@ -24,16 +24,16 @@ HandOff.StatusTable["punch_windup"] = function(ply)
         }
         ply:FireBullets(bul)
     end
-    HandOff.Status="punch"
-    HandOff.StatusEnd=CurTime()+0.5
+    ply.HandOffStatus="punch"
+    ply.HandOffStatusEnd=CurTime()+0.5
 end
 
 if SERVER then
     util.AddNetworkString(netstring)
     concommand.Add("+punch", function(ply)
-        if HandOff.Status ~= "idle" then return end
-        HandOff.Status = "punch_windup"
-        HandOff.StatusEnd = CurTime()+0.2
+        if ply.HandOffStatus ~= "idle" then return end
+        ply.HandOffStatus = "punch_windup"
+        ply.HandOffStatusEnd = CurTime()+0.2
         net.Start(netstring)
         net.Send(ply)
     end)
@@ -51,7 +51,8 @@ else
     }
     net.Receive(netstring, function()
         HandOff.UpdateCTable(punchTable)
-        HandOff.Status = "punch_windup"
-        HandOff.StatusEnd = CurTime()+0.2
+        local ply = LocalPlayer()
+        ply.HandOffStatus= "punch_windup"
+        ply.HandOffStatusEnd = CurTime()+0.2
     end)
 end

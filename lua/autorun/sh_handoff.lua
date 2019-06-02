@@ -2,17 +2,17 @@ if SERVER then
     AddCSLuaFile()
 end
 HandOff = HandOff or {}
-HandOff.Status = "idle"
-HandOff.StatusEnd = -1
 HandOff.StatusTable = HandOff.StatusTable or {
     --["test"] = function() print("status ended") end
 }
 
 function HandOff.Update(ply)
-    if HandOff.StatusEnd~=-1 and HandOff.StatusEnd<=CurTime() then
-        local f = HandOff.StatusTable[HandOff.Status]
-        HandOff.StatusEnd=-1
-        HandOff.Status="idle"
+    ply.HandOffStatus = ply.HandOffStatus or "idle"
+    ply.HandOffStatusEnd = ply.HandOffStatusEnd or -1
+    if ply.HandOffStatusEnd~=-1 and ply.HandOffStatusEnd<=CurTime() then
+        local f = HandOff.StatusTable[ply.HandOffStatus]
+        ply.HandOffStatusEnd=-1
+        ply.HandOffStatus="idle"
         if f then
             f(ply)
         end
