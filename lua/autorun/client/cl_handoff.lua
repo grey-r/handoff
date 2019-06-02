@@ -8,6 +8,7 @@ HandOff.CTable = {
     ["left"] = true,
     ["blendin"] = true,
     ["blendout"] = true,
+    ["loop"] = false,
     ["follow_vm"] = true,
     ["active"] = false
 }
@@ -19,7 +20,7 @@ function HandOff.UpdateCTable(t)
     if og_model ~= HandOff.CTable.model then
         HandOff.UpdateCMod()
     end
-    if og_seq ~= HandOff.CTable.sequence then
+    if og_seq ~= HandOff.CTable.sequence and HandOff.CTable.active then
         HandOff.PlaySequence(HandOff.CTable.sequence)
     end
 end
@@ -228,6 +229,7 @@ function HandOff.PlaySequence(seq)
     if seq then
         HandOff.CMod:ResetSequence(seq)
         HandOff.CTable.sequence = seq
+        HandOff.CTable.active = true
     end
     HandOff.CMod:SetCycle(0)
 end
@@ -261,6 +263,13 @@ hook.Add("PreDrawPlayerHands","handoff",function()
             HandOff.CMod:SetAngles(LocalPlayer():EyeAngles())
         end
         HandOff.CMod:FrameAdvance(FrameTime())
+        if HandOff.CTable.active and HandOff.CMod:GetCycle() > 0.99 then
+            if HandOff.CTable.loop then
+                HandOff.CMod:SetCycle(0)
+            else
+                HandOff.CTable.active = false
+            end
+        end
         HandOff.CMod:SetupBones()
         if HandOff.CTable.draw then
             HandOff.CMod:DrawModel()
