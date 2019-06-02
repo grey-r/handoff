@@ -5,19 +5,31 @@ local stats = {
     ["range"] = 64
 }
 
+local function cbf(a,b,c)
+    if c then
+        c:SetDamageType(DMG_CLUB)
+    end
+end
+
+HandOff.StatusTable["punch_windup"] = function(ply)
+    if not IsFirstTimePredicted() then return end
+    local tr = util.QuickTrace(ply:GetShootPos(),ply:EyeAngles():Forward()*stats.range,{ply,ply:GetActiveWeapon()})
+    if tr.Hit and tr.Fraction<1 then
+        local bul = {
+            ["Damage"] = stats.dmg,
+            ["Src"] = tr.HitPos - tr.Normal * 4,
+            ["Dir"] = tr.Normal * 8,
+            ["Distance"] = 8,
+            ["Callback"] = cbf
+        }
+        ply:FireBullets(bul)
+    end
+    HandOff.Status="punch"
+    HandOff.StatusEnd=CurTime()+0.5
+end
+
 if SERVER then
     util.AddNetworkString(netstring)
-    HandOff.StatusTable["punch_windup"] = function(ply)
-        local tr = util.QuickTrace(ply:GetShootPos(),ply:EyeAngles():Forward()*stats.range,{ply,ply:GetActiveWeapon()})
-        if tr.Hit and tr.Fraction<1 and IsValid(tr.Entity) then
-            local bul = {
-                ["Damage"] = stats.dmg,
-                ["Src"] = tr.HitPos - tr.HitNormal * 4,
-                ["Dir"] = tr.HitPos + tr.HitNormal * 4
-            }
-            ply:FireBullets(bul)
-        end
-    end
     concommand.Add("+punch", function(ply)
         if HandOff.Status ~= "idle" then return end
         HandOff.Status = "punch_windup"
