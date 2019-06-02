@@ -20,6 +20,14 @@ function HandOff.Update(ply)
 end
 
 hook.Add("PlayerTick","HandOff",HandOff.Update)
+if game.SinglePlayer() and CLIENT then
+    hook.Add("Think","HandOff",function()
+        local ply = LocalPlayer()
+        if IsValid(ply) then
+            HandOff.Update(ply)
+        end
+    end)
+end
 
 local path = "handoff/"
 local flist = file.Find(path.."*.lua","LUA")

@@ -230,12 +230,13 @@ end
 
 function HandOff.PlaySequence(seq)
     if not IsValid(HandOff.CMod) then return end
+    local ogseq=seq
     if type(seq)=="string" then
         seq=HandOff.CMod:LookupSequence(seq)
     end
     if seq then
         HandOff.CMod:ResetSequence(seq)
-        HandOff.CTable.sequence = seq
+        HandOff.CTable.sequence = ogseq
         HandOff.CTable.active = true
     end
     HandOff.CMod:SetCycle(0)
