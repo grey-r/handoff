@@ -11,7 +11,7 @@ local drawtable = {
     ["blendin"] = true,
     ["blendout"] = false,
     ["loop"] = false,
-    ["follow_vm"] = true,
+    ["follow_vm"] = false,
     ["active"] = true
 }
 
@@ -23,7 +23,7 @@ local idletable = {
     ["blendin"] = false,
     ["blendout"] = false,
     ["loop"] = true,
-    ["follow_vm"] = true,
+    ["follow_vm"] = false,
     ["active"] = true
 }
 
@@ -35,7 +35,7 @@ local holstertable = {
     ["blendin"] = false,
     ["blendout"] = true,
     ["loop"] = false,
-    ["follow_vm"] = true,
+    ["follow_vm"] = false,
     ["active"] = true
 }
 
@@ -44,7 +44,7 @@ local flashlight = {
     ["distance"] = 12 * 50, -- default 50 feet
     ["attachment"] = 1,
     ["brightness"] = 1,
-    ["fov"] = 60
+    ["fov"] = 70
 
 }
 
@@ -120,9 +120,10 @@ if CLIENT then
         if flashStatus[ply.HandOffStatus] then
             local angpos
             local islocal = (ply==LocalPlayer()) and not ply:ShouldDrawLocalPlayer()
-            if islocal then
+            if islocal and IsValid(HandOff.CMod) then
+                HandOff.CMod:SetupBones()
                 angpos = HandOff.CMod:GetAttachment(flashlight.attachment)
-                angpos.Pos = angpos.Pos - angpos.Ang:Forward()*8
+                angpos.Pos = angpos.Pos - angpos.Ang:Forward()
             else
                 local p,a = ply:GetBonePosition(ply:LookupBone("ValveBiped.Bip01_R_Hand") or 1)
                 angpos = {
@@ -158,7 +159,8 @@ if CLIENT then
         end
     end
     hook.Add("PostPlayerDraw","HandOffFlashlight",DrawFlashlight)
-    hook.Add("PostDrawViewModel","HandOffFlashlight",function()
+    hook.Add("PostDrawViewModel","HandOffFlashlight",function() end)
+    hook.Add("PostDrawPlayerHands","HandOffFlashlight",function()
         DrawFlashlight(LocalPlayer())
     end)
 end

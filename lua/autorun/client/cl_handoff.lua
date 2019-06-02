@@ -267,8 +267,8 @@ hook.Add("PreDrawPlayerHands","handoff",function()
                 HandOff.CMod:SetLocalAngles(angle_zero)
             end
         else
-            HandOff.CMod:SetPos(LocalPlayer():EyePos())
-            HandOff.CMod:SetAngles(LocalPlayer():EyeAngles())
+            HandOff.CMod:SetPos(EyePos())
+            HandOff.CMod:SetAngles(EyeAngles())
         end
         HandOff.CMod:FrameAdvance(FrameTime())
         if HandOff.CTable.active and HandOff.CMod:GetCycle() > 0.99 then
@@ -279,7 +279,7 @@ hook.Add("PreDrawPlayerHands","handoff",function()
             end
         end
         HandOff.CMod:SetupBones()
-        if HandOff.CTable.draw then
+        if HandOff.CTable.draw and HandOff.CTable.active then
             HandOff.CMod:DrawModel()
         end
     end
