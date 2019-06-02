@@ -7,7 +7,8 @@ HandOff.CTable = {
     ["draw"] = false,
     ["left"] = true,
     ["blendin"] = true,
-    ["blendout"] = true
+    ["blendout"] = true,
+    ["follow_vm"] = false
 }
 
 local rotAng = Angle(90,0,0)
@@ -166,7 +167,7 @@ function HandOff.UpdateCMod()
     HandOff.CMod.HOBBCB = HandOff.CMod:AddCallback("BuildBonePositions", HandOff.CModCallback)
     HandOff.CMod:SetNoDraw(not HandOff.CTable.draw)
     HandOff.CMod:DrawShadow(HandOff.CTable.draw)
-    if IsValid(HandOff.VMod) then
+    if IsValid(HandOff.VMod) and HandOff.CTable.follow_vm then
         HandOff.CMod:SetParent(HandOff.VMod)
         HandOff.CMod:SetLocalPos(vector_origin)
         HandOff.CMod:SetLocalAngles(angle_zero)
@@ -234,6 +235,10 @@ hook.Add("PreDrawPlayerHands","handoff",function()
     if not IsValid(HandOff.CMod) then
         HandOff.UpdateCMod()
     else
+        if not HandOff.CTable.follow_vm then
+            HandOff.CMod:SetPos(EyePos())
+            HandOff.CMod:SetAngles(EyeAngles())
+        end
         HandOff.CMod:FrameAdvance(FrameTime())
         HandOff.CMod:SetupBones()
     end
