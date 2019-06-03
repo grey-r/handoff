@@ -22,8 +22,7 @@ local punchTable = {
     ["follow_vm"] = false,
     ["active"] = true, 
     ["events"] = {
-        { ["time"] = 0.1, ["type"] = "sound", ["value"] = Sound("weapons/357_fire2.wav") },
-        { ["time"] = 0.5, ["type"] = "lua", ["value"] = function() print("fuck") end }
+        { ["time"] = 0, ["type"] = "sound", ["value"] = Sound("weapons/iceaxe/iceaxe_swing1.wav") }
     }
 }
 
