@@ -181,14 +181,16 @@ local oldvm=""
 local oldpar
 
 local HANDOFF_OVR = false
-hook.Add("PreDrawPlayerHands","zzz_handoff",function(hands,vm,ply,...)
+hook.Add("PreDrawPlayerHands","zzz_handoff",function(hands,vm,ply,wep,...)
     if not ply.CTable then
         ply.CTable=table.Copy(HandOff.CTable)
     end
     if not IsValid(hands) then return end
     if not HANDOFF_OVR then
         HANDOFF_OVR = true
-        hook.Call("PreDrawPlayerHands",hands,GM or GAMEMODE,...)
+        if IsValid(wep) then
+            hook.Call("PreDrawPlayerHands",GM or GAMEMODE,hands,vm,ply,wep,...)
+        end
         HANDOFF_OVR = false
     end
     if not IsValid(HandOff.VMod) then
