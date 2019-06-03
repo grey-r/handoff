@@ -52,16 +52,14 @@ HandOff.StatusTable["flashlight_draw"] = function(ply)
     if not (IsFirstTimePredicted() or game.SinglePlayer()) then return end
     ply.HandOffStatus="flashlight_idle"
     ply.HandOffStatusEnd=CurTime()+0.1
-    if CLIENT then
-        HandOff.UpdateCTable(idletable)
-    end
+    HandOff.UpdateCTable(ply,idletable)
 end
 HandOff.StatusTable["flashlight_idle"] = function(ply)
     if not (IsFirstTimePredicted() or game.SinglePlayer()) then return end
     ply.HandOffStatus="flashlight_idle"
     ply.HandOffStatusEnd=CurTime() + 0.1
-    if CLIENT and HandOff.CTable.sequence ~= idletable.sequence then
-        HandOff.UpdateCTable(idletable)
+    if HandOff.CTable.sequence ~= idletable.sequence then
+        HandOff.UpdateCTable(ply,idletable)
     end
 end
 
@@ -111,13 +109,13 @@ if CLIENT then
             ply.HandOffStatus="flashlight_draw"
             ply.HandOffStatusEnd = CurTime()+drawtime
             if ply==LocalPlayer() then
-                HandOff.UpdateCTable(drawtable)
+                HandOff.UpdateCTable(ply,drawtable)
             end
         else
             ply.HandOffStatus="flashlight_holster"
             ply.HandOffStatusEnd = CurTime()+holstertime
             if ply==LocalPlayer() then
-                HandOff.UpdateCTable(holstertable)
+                HandOff.UpdateCTable(ply,holstertable)
             end
         end
     end)

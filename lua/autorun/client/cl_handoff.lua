@@ -1,44 +1,12 @@
 HandOff = HandOff or {}
 HandOff.VMod=nil
 HandOff.CMod=nil
-HandOff.CTable = {
-    ["model"] = "models/weapons/c_arms_animations.mdl",
-    ["sequence"] = "fists_left",
-    ["draw"] = false,
-    ["left"] = true,
-    ["blendin"] = true,
-    ["blendout"] = true,
-    ["loop"] = false,
-    ["follow_vm"] = true,
-    ["active"] = false
-}
 HandOff.ProxyModel = "models/weapons/v_hands.mdl"
 
 local function LerpAngleFast(t,a1,a2)
 	a1.p = math.ApproachAngle(a1.p, a2.p, math.AngleDifference(a2.p, a1.p) * t)
 	a1.y = math.ApproachAngle(a1.y, a2.y, math.AngleDifference(a2.y, a1.y) * t)
     a1.r = math.ApproachAngle(a1.r, a2.r, math.AngleDifference(a2.r, a1.r) * t)
-end
-
-function HandOff.RequestCTable(t)
-    if not HandOff.CTable.active then
-        HandOff.UpdateCTable(t)
-        return true
-    end
-    return false
-end
-
-function HandOff.UpdateCTable(t)
-    local og_model = HandOff.CTable.model
-    local og_seq = HandOff.CTable.sequence
-    local og_act = HandOff.CTable.active
-    table.Merge(HandOff.CTable,t)
-    if og_model ~= HandOff.CTable.model then
-        HandOff.UpdateCMod()
-    end
-    if (og_seq ~= HandOff.CTable.sequence or og_actg ~= HandOff.CTable.active) and HandOff.CTable.active then
-        HandOff.PlaySequence(HandOff.CTable.sequence)
-    end
 end
 
 local rotAng = Angle(90,0,0)
@@ -53,6 +21,8 @@ function HandOff:VModCallback(boneCount)
     if not IsValid(HandOff.CMod) then return end
     if not HandOff.VMod.HandOffBoneLUT then return end
     if not HandOff.VMod.HandOffParLUT then return end
+    local ply = LocalPlayer()
+    if not IsValid(ply) then return end
 
     local par = self:GetParent()
     local PIV = IsValid(par) and par.BoneCache
@@ -61,9 +31,9 @@ function HandOff:VModCallback(boneCount)
     end
 
     local bin,bout,fac
-    bin = HandOff.CTable.blendin
-    bout = HandOff.CTable.blendout
-    fac = HandOff.CTable.active and 1 or 0
+    bin = ply.CTable.blendin
+    bout = ply.CTable.blendout
+    fac = ply.CTable.active and 1 or 0
     if bin then
         if not isnumber(bin) then
             bin = 0.2 / HandOff.CMod:SequenceDuration() --0.2 seconds blend
@@ -143,16 +113,18 @@ function HandOff.UpdateVMod()
 end
 
 function HandOff.UpdateCMod()
+    local ply = LocalPlayer()
+    if not IsValid(ply) then return end
     if IsValid(HandOff.CMod) then
         HandOff.CMod:Remove()
     end
-    if not HandOff.CTable.model then return end
-    if HandOff.CTable.model=="" then return end
-    HandOff.CMod=ClientsideModel(HandOff.CTable.model,RENDERGROUP_VIEWMODEL)
+    if not ply.CTable.model then return end
+    if ply.CTable.model=="" then return end
+    HandOff.CMod=ClientsideModel(ply.CTable.model,RENDERGROUP_VIEWMODEL)
     HandOff.CMod.HOBBCB = HandOff.CMod:AddCallback("BuildBonePositions", HandOff.CModCallback)
     HandOff.CMod:SetNoDraw(true)
-    HandOff.CMod:DrawShadow(HandOff.CTable.draw)
-    if IsValid(HandOff.VMod) and HandOff.CTable.follow_vm then
+    HandOff.CMod:DrawShadow(ply.CTable.draw)
+    if IsValid(HandOff.VMod) and ply.CTable.follow_vm then
         HandOff.CMod:SetParent(HandOff.VMod)
         HandOff.CMod:SetLocalPos(vector_origin)
         HandOff.CMod:SetLocalAngles(angle_zero)
@@ -166,6 +138,8 @@ function HandOff.UpdateCMod()
 end
 
 function HandOff.UpdateLUT()
+    local ply = LocalPlayer()
+    if not IsValid(ply) then return end
     if not IsValid(HandOff.CMod) then return end
     if not IsValid(HandOff.VMod) then return end
     table.Empty(HandOff.VMod.HandOffBoneLUT)
@@ -175,7 +149,7 @@ function HandOff.UpdateLUT()
     local bc = HandOff.VMod:GetBoneCount()
     for i=0, bc-1 do
         local bn = HandOff.VMod:GetBoneName(i)
-        if not ( HandOff.CTable.left and not string.find(string.lower(bn),"l_") ) then
+        if not ( ply.CTable.left and not string.find(string.lower(bn),"l_") ) then
             local bid = HandOff.CMod:LookupBone(bn)
             HandOff.VMod.HandOffBoneLUT[i]=bid
         end
@@ -188,6 +162,8 @@ function HandOff.UpdateLUT()
 end
 
 function HandOff.PlaySequence(seq)
+    local ply = LocalPlayer()
+    if not IsValid(ply) then return end
     if not IsValid(HandOff.CMod) then return end
     local ogseq=seq
     if type(seq)=="string" then
@@ -195,8 +171,8 @@ function HandOff.PlaySequence(seq)
     end
     if seq then
         HandOff.CMod:ResetSequence(seq)
-        HandOff.CTable.sequence = ogseq
-        HandOff.CTable.active = true
+        ply.CTable.sequence = ogseq
+        ply.CTable.active = true
     end
     HandOff.CMod:SetCycle(0)
 end
@@ -205,7 +181,10 @@ local oldvm=""
 local oldpar
 
 local HANDOFF_OVR = false
-hook.Add("PreDrawPlayerHands","zzz_handoff",function(hands,...)
+hook.Add("PreDrawPlayerHands","zzz_handoff",function(hands,vm,ply,...)
+    if not ply.CTable then
+        ply.CTable=table.Copy(HandOff.CTable)
+    end
     if not IsValid(hands) then return end
     if not HANDOFF_OVR then
         HANDOFF_OVR = true
@@ -215,7 +194,6 @@ hook.Add("PreDrawPlayerHands","zzz_handoff",function(hands,...)
     if not IsValid(HandOff.VMod) then
         HandOff.UpdateVMod()
     else
-        local vm=LocalPlayer():GetViewModel()
         if IsValid(vm) and ( vm:GetModel()~=oldvm or vm:GetParent()~=oldpar ) then
             oldvm=vm:GetModel()
             oldpar=vm:GetParent()
@@ -232,7 +210,7 @@ hook.Add("PreDrawPlayerHands","zzz_handoff",function(hands,...)
     if not IsValid(HandOff.CMod) then
         HandOff.UpdateCMod()
     else
-        if HandOff.CTable.follow_vm then
+        if ply.CTable.follow_vm then
             HandOff.CMod:SetParent(HandOff.VMod)
             HandOff.CMod:SetLocalPos(vector_origin)
             HandOff.CMod:SetLocalAngles(angle_zero)
@@ -241,16 +219,16 @@ hook.Add("PreDrawPlayerHands","zzz_handoff",function(hands,...)
             HandOff.CMod:SetAngles(EyeAngles())
         end
         HandOff.CMod:FrameAdvance(FrameTime())
-        if HandOff.CTable.active and HandOff.CMod:GetCycle() > 0.99 then
-            if HandOff.CTable.loop then
+        if ply.CTable.active and HandOff.CMod:GetCycle() > 0.99 then
+            if ply.CTable.loop then
                 HandOff.CMod:SetCycle(0)
             else
-                HandOff.CTable.active = false
+                ply.CTable.active = false
             end
         end
         HandOff.CMod:SetupBones()
         HandOff.VMod:SetupBones()
-        if HandOff.CTable.draw and HandOff.CTable.active then
+        if ply.CTable.draw and ply.CTable.active then
             HandOff.CMod:DrawModel()
         end
     end
