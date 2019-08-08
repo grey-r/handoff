@@ -1,7 +1,7 @@
 local netstring="HANDOFFFLASHLIGHT"
 
-local drawtime = 0.15
-local holstertime = 0.1
+local drawtime = 0.25
+local holstertime = 0.25
 
 local drawtable = {
     ["model"] = "models/weapons/yurie_underhell/c_flashlight_pg.mdl",
@@ -39,6 +39,18 @@ local holstertable = {
     ["active"] = true
 }
 
+local reltable = {
+    ["model"] = "models/weapons/yurie_underhell/c_flashlight_pg.mdl",
+    ["sequence"] = "flashlight_idle",
+    ["draw"] = false,
+    ["left"] = true,
+    ["blendin"] = false,
+    ["blendout"] = false,
+    ["loop"] = true,
+    ["follow_vm"] = true,
+    ["active"] = false
+}
+
 local flashlight = {
     ["material"] = Material("effects/flashlight001"),
     ["distance"] = 12 * 50, -- default 50 feet
@@ -47,6 +59,22 @@ local flashlight = {
     ["fov"] = 70
 
 }
+
+local function IsReloading(ply)
+    local wep = ply:GetActiveWeapon()
+    if wep.GetReloading then
+        if wep:GetReloading() then
+            return true
+        end
+    else
+        local vm = ply:GetViewModel()
+        local n = string.lower(vm:GetSequenceName(vm:GetSequence()))
+        if IsValid(vm) and vm:GetCycle() < 0.99 and string.find(n,"reload") or string.find(n,"inser") then
+            return true
+        end
+    end
+    return false
+end
 
 HandOff.StatusTable["flashlight_draw"] = function(ply)
     if not (IsFirstTimePredicted() or game.SinglePlayer()) then return end
@@ -62,15 +90,38 @@ HandOff.StatusTable["flashlight_idle"] = function(ply)
         HandOff.UpdateCTable(ply,idletable)
     end
 end
+HandOff.StatusTable["flashlight_holster_reload"] = function(ply)
+    if not IsReloading(ply) then
+        ply.HandOffStatus="flashlight_draw"
+        ply.HandOffStatusEnd = CurTime()+drawtime
+        if SERVER then
+            net.Start(netstring)
+            net.WriteEntity(ply)
+            net.WriteString(ply.HandOffStatus)
+            net.Broadcast()
+        end
+        return
+    end
+    ply.HandOffStatus="flashlight_idle_reload"
+    ply.HandOffStatusEnd=CurTime() + 0.1
+    if HandOff.CTable.sequence ~= reltable.sequence then
+        HandOff.UpdateCTable(ply,reltable)
+    end
+end
+HandOff.StatusTable["flashlight_idle_reload"] = HandOff.StatusTable["flashlight_holster_reload"]
 
 local ignoreStatus = {
     ["flashlight_draw"] = true,
-    ["flashlight_holster"] = true
+    ["flashlight_holster"] = true,
+    ["flashlight_idle_reload"] = true,
+    ["flashlight_holster_reload"] = true
 }
 local flashStatus = {
     ["flashlight_draw"] = true,
     ["flashlight_idle"] = true,
-    ["flashlight_holster"] = true
+    ["flashlight_idle_reload"] = true,
+    ["flashlight_holster"] = true,
+    ["flashlight_holster_reload"] = true
 }
 if SERVER then
     util.AddNetworkString(netstring)
@@ -92,6 +143,16 @@ if SERVER then
             net.Broadcast()
         end
     end)
+    hook.Add("PlayerTick","HandOffFlashlight",function(ply)
+        if ply.HandOffStatus=="flashlight_idle" and IsReloading(ply) then
+            ply.HandOffStatus="flashlight_holster_reload"
+            ply.HandOffStatusEnd=CurTime()+holstertime
+            net.Start(netstring)
+            net.WriteEntity(ply)
+            net.WriteString(ply.HandOffStatus)
+            net.Broadcast()
+        end
+    end)
 end
 if CLIENT then
     hook.Add("StartCommand", "HandOffFlashlight", function(ply,cmd)
@@ -104,15 +165,13 @@ if CLIENT then
     net.Receive(netstring,function()
         local ply = net.ReadEntity()
         local s = net.ReadString()
-        local active = (s=="flashlight_draw")
-        if active then
-            ply.HandOffStatus="flashlight_draw"
+        ply.HandOffStatus = s
+        if ply.HandOffStatus=="flashlight_draw" then
             ply.HandOffStatusEnd = CurTime()+drawtime
             if ply==LocalPlayer() then
                 HandOff.UpdateCTable(ply,drawtable)
             end
-        else
-            ply.HandOffStatus="flashlight_holster"
+        elseif ply.HandOffStatus=="flashlight_holster" or ply.HandOffStatus=="flashlight_holster_reload" then
             ply.HandOffStatusEnd = CurTime()+holstertime
             if ply==LocalPlayer() then
                 HandOff.UpdateCTable(ply,holstertable)
